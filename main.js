@@ -1,44 +1,12 @@
 import Expo from 'expo';
 import React from 'react';
 import { StyleSheet, Text, View, Button, Image} from 'react-native';
-// import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 Expo.Audio.setIsEnabledAsync(true);
 
-const sound = new Expo.Audio.Sound({
-  source: 'http://traffic.libsyn.com/blackastronautspodcast/HWHAP-_Dianne_Bruce.mp3?dest-id=138957',
-});
-
 var playing = false;
 var rate = 1.0;
-
-var _handlePlaySoundAsync = () => {
-  if (playing) {
-    sound.pauseAsync()
-    playing = false;
-  } else {
-  sound.loadAsync()
-  .then(() => {
-    playing = true;
-    sound.playAsync();
-  })
-  }
-};
-
-var _handleIncreaseSpeed = () => {
-  if (rate < 32) {
-    rate += 0.25;
-  }
-  sound.setRateAsync(rate, true)
-}
-
-var _handleDecreaseSpeed = () => {
-  if (rate > 0) {
-    rate -= 0.25;
-  }
-  sound.setRateAsync(rate, true)
-}
-
 
 class App extends React.Component {
   constructor() {
@@ -47,46 +15,79 @@ class App extends React.Component {
           podcasts: 'Podcasts Loading',
           playing: {}
       }
+    this.sound = '';
   }
 
   componentDidMount() {
-    this.getPodcasts()
-    .then(this.postFeed)
-    .catch(console.log);
+    this.getPodcasts();
   }
 
   getPodcasts () {
-    return fetch('https://itunes.apple.com/search?term=black+astronauts+podcast')
+    fetch('https://itunes.apple.com/search?term=black+astronauts+podcast')
       .then(response => response.json())
       .then(response => {
         this.setState({
           podcasts: response.results
         });
-        return response.results[0].feedUrl;
-      });
+        console.warn(JSON.stringify(this.state.podcasts))
+        this.postFeed(this.state.podcasts[0].feedUrl);
+      })
+      .catch(console.log);
   }
 
   postFeed (feedUrl) {
-
-    console.warn(feedUrl);
-
-    return fetch('http://10.0.2.2:3000/api/podcastParse', {
+    console.warn(feedUrl)
+    fetch('https://expo-tut-server.herokuapp.com/api/podcastParse', {
       method: 'post',
-      data: JSON.stringify({
-        feedUrl: feedUrl
+      body: JSON.stringify({
+        url: feedUrl
       }),
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       }
     })
-    .then(response => response.json())
+    .then(response => {console.warn('response: ', response);
+      return response.json()})
     .then(podcastObj => {
       console.warn(podcastObj);
       this.setState({
         playing: podcastObj
+      }, () => {this.sound = new Expo.Audio.Sound({
+        source: this.state.playing.enclosure.url
       });
-    });
+      console.warn(this.state.playing.enclosure.url);
+      });
+    })
+    .catch(console.log);
+  }
+
+
+  _handlePlaySoundAsync () {
+    if (playing) {
+      this.sound.pauseAsync()
+      playing = false;
+    } else {
+    this.sound.loadAsync()
+    .then(() => {
+      playing = true;
+      this.sound.playAsync();
+    })
+    }
+  }
+
+  _handleIncreaseSpeed () {
+    if (rate < 32) {
+      rate += 0.25;
+    }
+    this.sound.setRateAsync(rate, true)
+  }
+
+  _handleDecreaseSpeed () {
+    if (rate > 0) {
+      rate -= 0.25;
+    }
+    this.sound.setRateAsync(rate, true)
   }
 
   render() {
@@ -103,19 +104,19 @@ class App extends React.Component {
           {this.state.podcasts[0].trackName}
         </Text>
         <Text style={styles.description}>
-          {this.state.playing.description}
+          {this.state.playing.subtitle}
         </Text>
         <Button style={styles.controlButtons}
           title="Play/Pause"
-          onPress={_handlePlaySoundAsync}
+          onPress={this._handlePlaySoundAsync}
         />
         <Button style={styles.controlButtons}
           title="Increase Speed"
-          onPress={_handleIncreaseSpeed}
+          onPress={this._handleIncreaseSpeed}
         />
         <Button style={styles.controlButtons}
           title="Decrease Speed"
-          onPress={_handleDecreaseSpeed}
+          onPress={this._handleDecreaseSpeed}
         />
       </View>
     );
